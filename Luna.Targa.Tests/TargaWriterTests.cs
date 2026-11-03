@@ -44,7 +44,7 @@ public class TargaWriterTests
 
         var       original = pixels.ToArray();
         using var stream   = new MemoryStream();
-        TargaWriter.WriteColorMapped(stream, new Image(count, 8, pixels), encodeRunLength: runLength);
+        TargaWriter.WriteColorMapped(stream, new Image(count, 8, pixels), encodeRunLength: runLength, allow16BitIndices: true);
         var encoded = stream.ToArray();
 
         Assert.Equal(runLength ? 9 : 1,     encoded[2]);
