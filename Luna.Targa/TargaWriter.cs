@@ -1,7 +1,5 @@
-using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
 using System.Runtime.Intrinsics.X86;
-using System.Text;
 using Luna.Targa.Enums;
 using Luna.Targa.Structs;
 
@@ -78,12 +76,13 @@ public static class TargaWriter
     /// <param name="data"> The RGBA32 image to write as Targa. </param>
     /// <param name="id"> A custom identifier to write to the image. May be 0 up to 255 bytes. </param>
     /// <param name="encodeRunLength"> Whether to use run-length encoding compression when writing the color map indices. </param>
+    /// <param name="allow16BitIndices"> Whether to only allow color maps of at most 256 entries. Many applications can not handle 16-bit color map indices. </param>
     /// <remarks> When not using run-length encoding, if the resulting color mapped image is larger than the true color image would be, a true color image is written instead. </remarks>
-    public static void WriteColorMapped(Stream stream, in Image data, ReadOnlySpan<byte> id = default, bool encodeRunLength = true)
+    public static void WriteColorMapped(Stream stream, in Image data, ReadOnlySpan<byte> id = default, bool encodeRunLength = true, bool allow16BitIndices = false)
     {
-        if (!CreateColorMap(data.Pixels, out var colorMap, out var indices)
+        if (!CreateColorMap(data.Pixels, out var colorMap, out var indices, allow16BitIndices)
          || colorMap.Count > byte.MaxValue + 1 && colorMap.Count * 4 > indices.Length * 2
-         || !encodeRunLength && colorMap.Count * 4 > indices.Length * 3)
+         || allow16BitIndices && !encodeRunLength && colorMap.Count * 4 > indices.Length * 3)
         {
             WriteRgba32(stream, data, id, encodeRunLength);
             return;
@@ -187,12 +186,13 @@ public static class TargaWriter
         return b;
     }
 
-    private static bool CreateColorMap(ReadOnlySpan<byte> data, out IReadOnlyCollection<uint> colorMap, out ushort[] indices)
+    private static bool CreateColorMap(ReadOnlySpan<byte> data, out IReadOnlyCollection<uint> colorMap, out ushort[] indices, bool allow16BitIndices)
     {
         var dict   = new Dictionary<uint, ushort>(256);
         var colors = MemoryMarshal.Cast<byte, uint>(data);
         indices  = new ushort[colors.Length];
         colorMap = dict.Keys;
+        var maximum = allow16BitIndices ? ushort.MaxValue : byte.MaxValue;
         for (var i = 0; i < indices.Length; ++i)
         {
             var color = colors[i];
@@ -200,7 +200,7 @@ public static class TargaWriter
             {
                 indices[i] = index;
             }
-            else if (dict.Count is ushort.MaxValue)
+            else if (dict.Count == maximum)
             {
                 return false;
             }
