@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 
 namespace Luna.Targa.Structs;
@@ -75,12 +76,20 @@ internal interface IPixelType
         where TContext : allows ref struct
     {
         var pixels = MemoryMarshal.Cast<byte, TPixel>(data);
+        if (pixels.Length is 1)
+        {
+            var pixel = pixels[0];
+            var color = pixel.GetRgba(context);
+            rgba[..repetitions].Fill(color);
+            return;
+        }
+
+        Debug.Assert(repetitions is 1, $"Package somehow has repetitions {repetitions} and pixel length {pixels.Length}.");
         for (var i = 0; i < pixels.Length; ++i)
         {
             var pixel = pixels[i];
             var color = pixel.GetRgba(context);
-            for (var j = 0; j < repetitions; ++j)
-                rgba[i + j * pixels.Length] = color;
+            rgba[i] = color;
         }
     }
 
